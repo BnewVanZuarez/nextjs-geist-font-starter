@@ -1,0 +1,153 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+        cache: true
+    
+    - name: Install dependencies
+      run: flutter pub get
+    
+    - name: Verify formatting
+      run: dart format --output=none --set-exit-if-changed .
+    
+    - name: Analyze project source
+      run: flutter analyze
+    
+    - name: Run tests
+      run: flutter test --coverage
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: coverage/lcov.info
+
+  build-web:
+    name: Build Web
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+        cache: true
+    
+    - name: Install dependencies
+      run: flutter pub get
+    
+    - name: Build web
+      run: flutter build web --release
+    
+    - name: Upload web build
+      uses: actions/upload-artifact@v3
+      with:
+        name: web-build
+        path: build/web
+        retention-days: 1
+
+  deploy:
+    name: Deploy
+    needs: build-web
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Download web build
+      uses: actions/download-artifact@v3
+      with:
+        name: web-build
+        path: build/web
+    
+    - name: Deploy to Firebase
+      uses: FirebaseExtended/action-hosting-deploy@v0
+      with:
+        repoToken: '${{ secrets.GITHUB_TOKEN }}'
+        firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+        channelId: live
+        projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+
+  docker:
+    name: Build and Push Docker Image
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    
+    - name: Build and push
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/kasir-app:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/kasir-app:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/kasir-app:buildcache
+        cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/kasir-app:buildcache,mode=max
+
+  notify:
+    name: Notify
+    needs: [deploy, docker]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Send Discord Notification
+      uses: sarisia/actions-status-discord@v1
+      if: always()
+      with:
+        webhook: ${{ secrets.DISCORD_WEBHOOK }}
+        status: ${{ job.status }}
+        title: "Deployment Status"
+        description: |
+          Repository: ${{ github.repository }}
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}
+          Workflow: ${{ github.workflow }}
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+# Required secrets:
+# - FIREBASE_SERVICE_ACCOUNT: Firebase service account key
+# - FIREBASE_PROJECT_ID: Firebase project ID
+# - DOCKERHUB_USERNAME: Docker Hub username
+# - DOCKERHUB_TOKEN: Docker Hub access token
+# - DISCORD_WEBHOOK: Discord webhook URL for notifications
+# - SUPABASE_URL: Supabase project URL
+# - SUPABASE_ANON_KEY: Supabase anonymous key
