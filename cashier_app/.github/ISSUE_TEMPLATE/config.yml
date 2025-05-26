@@ -1,0 +1,26 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/yourusername/cashier_app/tree/main/docs
+    about: Check our documentation before creating an issue
+  - name: FAQ
+    url: https://github.com/yourusername/cashier_app/blob/main/docs/faq.md
+    about: Check frequently asked questions
+  - name: Discord Community
+    url: https://discord.gg/your-invite
+    about: Ask questions and discuss with other community members
+  - name: Security Issues
+    url: https://github.com/yourusername/cashier_app/security/policy
+    about: Please report security vulnerabilities here
+  - name: Feature Ideas Discussion
+    url: https://github.com/yourusername/cashier_app/discussions/categories/ideas
+    about: Discuss feature ideas with the community
+  - name: Troubleshooting Guide
+    url: https://github.com/yourusername/cashier_app/blob/main/docs/troubleshooting.md
+    about: Check common issues and their solutions
+  - name: Stack Overflow
+    url: https://stackoverflow.com/questions/tagged/kasir-app
+    about: Ask technical questions on Stack Overflow
+  - name: Email Support
+    url: mailto:support@example.com
+    about: Contact our support team for urgent issues
